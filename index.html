@@ -1,0 +1,1216 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AduanaQuiz Live - Juego Interactivo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a0b2e;
+            color: #ffffff;
+            overflow-x: hidden;
+        }
+        h1, h2, h3, .font-display {
+            font-family: 'Montserrat', sans-serif;
+        }
+        /* Kahoot style buttons with 3D bottom border */
+        .btn-kahoot {
+            transition: all 0.1s ease;
+            border-bottom-width: 6px;
+        }
+        .btn-kahoot:active {
+            transform: translateY(4px);
+            border-bottom-width: 2px;
+        }
+        .opt-a { background-color: #e21b3c; border-color: #9e1229; }
+        .opt-a:hover:not(:disabled) { background-color: #f02446; }
+        
+        .opt-b { background-color: #1368ce; border-color: #0c478f; }
+        .opt-b:hover:not(:disabled) { background-color: #1a76e3; }
+        
+        .opt-c { background-color: #d89e00; border-color: #966e00; }
+        .opt-c:hover:not(:disabled) { background-color: #ebb00c; }
+        
+        .opt-d { background-color: #26890c; border-color: #195c07; }
+        .opt-d:hover:not(:disabled) { background-color: #2ea110; }
+
+        /* Animated Background Pattern */
+        .bg-pattern {
+            background-color: #25076b;
+            background-image: radial-gradient(#46178f 2px, transparent 2px), radial-gradient(#46178f 2px, #25076b 2px);
+            background-size: 40px 40px;
+            background-position: 0 0, 20px 20px;
+        }
+
+        @keyframes pulse-scale {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        .animate-pulse-scale {
+            animation: pulse-scale 2s infinite ease-in-out;
+        }
+        @keyframes pop-in {
+            0% { opacity: 0; transform: scale(0.8); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        .animate-pop-in {
+            animation: pop-in 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+    </style>
+</head>
+<body class="bg-pattern min-h-screen flex flex-col justify-between selection:bg-purple-500 selection:text-white">
+
+    <!-- Navbar / Top Status -->
+    <header class="w-full p-4 flex justify-between items-center bg-black/30 backdrop-blur-md border-b border-white/10 z-10">
+        <div class="flex items-center gap-3 cursor-pointer" onclick="confirmReset()">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center font-display font-black text-xl shadow-lg">
+                A!
+            </div>
+            <div>
+                <span class="font-display font-extrabold text-xl tracking-tight">Aduana<span class="text-pink-400">Quiz</span></span>
+                <span class="hidden sm:inline-block ml-2 text-xs bg-white/10 px-2 py-0.5 rounded-full text-purple-200">Edición Ley Aduanera</span>
+            </div>
+        </div>
+        <div id="header-info" class="flex items-center gap-3">
+            <button id="sound-toggle" onclick="toggleSound()" class="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition text-sm flex items-center gap-1" title="Activar/Desactivar Sonido">
+                <span id="sound-icon">🔊</span>
+            </button>
+            <div id="room-badge" class="hidden bg-white text-purple-950 font-display font-black px-3 py-1 rounded-lg text-sm shadow">
+                PIN: <span id="header-pin">------</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main id="app-container" class="flex-grow flex items-center justify-center p-4 w-full max-w-6xl mx-auto">
+        <!-- Loading State -->
+        <div id="view-loading" class="text-center">
+            <div class="w-16 h-16 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p class="font-display font-bold text-lg text-purple-200">Conectando a la sala en tiempo real...</p>
+        </div>
+
+        <!-- View 1: Home / Role Selection -->
+        <div id="view-home" class="hidden w-full max-w-4xl animate-pop-in">
+            <div class="text-center mb-10">
+                <span class="inline-block py-1 px-3 rounded-full bg-pink-500/20 border border-pink-500/40 text-pink-300 text-xs font-bold uppercase tracking-wider mb-3">
+                    Dinámica Interactiva en Vivo
+                </span>
+                <h1 class="text-4xl sm:text-6xl font-black tracking-tight mb-4 drop-shadow-lg">
+                    Declaración de Dinero en <span class="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-pink-400 to-purple-400">Aduanas</span>
+                </h1>
+                <p class="text-purple-200 text-base sm:text-lg max-w-2xl mx-auto">
+                    Pon a prueba tus conocimientos sobre la normativa aduanera en México. Únete desde tu celular o proyecta la pantalla principal para toda la audiencia.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Card: Join as Player -->
+                <div class="bg-white/10 backdrop-blur-lg border border-white/20 rounded-3xl p-6 sm:p-8 shadow-2xl flex flex-col justify-between">
+                    <div>
+                        <div class="w-12 h-12 rounded-2xl bg-blue-500 flex items-center justify-center text-2xl mb-4 shadow-lg">📱</div>
+                        <h2 class="text-2xl font-extrabold mb-2">Unirse como Jugador</h2>
+                        <p class="text-purple-200 text-sm mb-6">Ingresa el PIN que aparece en la pantalla de la presentación y elige tu apodo.</p>
+                        
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-xs font-bold uppercase tracking-wider text-purple-300 mb-1">PIN del Juego</label>
+                                <input type="text" id="input-pin" maxlength="6" placeholder="Ej. 482910" 
+                                    class="w-full bg-white text-gray-900 font-display font-black text-center text-2xl tracking-widest py-3 px-4 rounded-xl focus:outline-none focus:ring-4 focus:ring-pink-500 uppercase"
+                                    oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold uppercase tracking-wider text-purple-300 mb-1">Tu Nombre o Apodo</label>
+                                <input type="text" id="input-nickname" maxlength="18" placeholder="Ej. Agente Aduanal" 
+                                    class="w-full bg-white/95 text-gray-900 font-bold text-center text-lg py-3 px-4 rounded-xl focus:outline-none focus:ring-4 focus:ring-pink-500">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button onclick="joinGame()" id="btn-join" class="mt-6 w-full btn-kahoot bg-emerald-500 hover:bg-emerald-400 border-emerald-700 text-white font-display font-black text-lg py-4 rounded-2xl shadow-lg cursor-pointer">
+                        ¡Entrar a la Partida!
+                    </button>
+                </div>
+
+                <!-- Card: Host Presentation -->
+                <div class="bg-gradient-to-br from-purple-900/80 to-indigo-950/80 backdrop-blur-lg border border-purple-400/30 rounded-3xl p-6 sm:p-8 shadow-2xl flex flex-col justify-between">
+                    <div>
+                        <div class="w-12 h-12 rounded-2xl bg-pink-500 flex items-center justify-center text-2xl mb-4 shadow-lg">🖥️</div>
+                        <h2 class="text-2xl font-extrabold mb-2">Crear Sala (Presentador)</h2>
+                        <p class="text-purple-200 text-sm mb-6">Ideal para proyectar en la pantalla principal. Controla el ritmo de las 6 preguntas y muestra el marcador en vivo.</p>
+                        
+                        <div class="bg-black/30 rounded-2xl p-4 border border-white/10 space-y-2 text-sm text-purple-200">
+                            <div class="flex items-center gap-2">
+                                <span class="text-amber-400">✦</span> <span><strong>6 Preguntas</strong> sobre Ley Aduanera y SAT</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-amber-400">✦</span> <span><strong>Multijugador</strong> en tiempo real sin límites</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-amber-400">✦</span> <span><strong>Puntos por velocidad</strong> y podio final</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button onclick="createGame()" id="btn-create" class="mt-6 w-full btn-kahoot bg-purple-600 hover:bg-purple-500 border-purple-800 text-white font-display font-black text-lg py-4 rounded-2xl shadow-lg cursor-pointer">
+                        Crear Nueva Sala
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== HOST VIEWS ==================== -->
+        
+        <!-- Host Lobby -->
+        <div id="view-host-lobby" class="hidden w-full max-w-5xl text-center animate-pop-in">
+            <div class="bg-white text-gray-900 rounded-3xl p-6 sm:p-10 shadow-2xl mb-8 inline-block max-w-3xl w-full border-b-8 border-gray-300">
+                <span class="inline-block bg-purple-100 text-purple-800 text-xs font-black uppercase tracking-wider px-3 py-1 rounded-full mb-3">
+                    🖥️ Panel del Presentador (Tú)
+                </span>
+                
+                <h2 class="text-2xl sm:text-3xl font-display font-black text-gray-900 mb-6">
+                    Comparte este enlace con tus alumnos:
+                </h2>
+
+                <div class="bg-purple-50 border-2 border-purple-200 rounded-2xl p-4 sm:p-6 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div class="text-left w-full truncate">
+                        <span class="text-xs font-bold text-purple-700 block uppercase tracking-wider mb-1">Enlace directo para jugar:</span>
+                        <input type="text" id="host-share-url" readonly class="w-full bg-white border border-purple-300 rounded-xl px-4 py-3 font-mono text-sm sm:text-base text-gray-800 select-all font-bold focus:outline-none" value="...">
+                    </div>
+                    <button onclick="copyInviteLink()" id="btn-copy-link" class="w-full sm:w-auto shrink-0 btn-kahoot bg-purple-600 hover:bg-purple-500 border-purple-800 text-white font-display font-black px-6 py-4 rounded-xl shadow-lg cursor-pointer flex items-center justify-center gap-2">
+                        <span>📋</span> <span id="copy-link-text">Copiar Enlace</span>
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-4 border-t border-gray-200 items-center">
+                    <div class="text-center sm:text-left">
+                        <p class="text-xs font-bold uppercase tracking-widest text-gray-500 mb-1">O ingresando con el PIN:</p>
+                        <div id="host-pin-display" class="font-display font-black text-4xl sm:text-5xl tracking-widest text-purple-900 select-all">
+                            000000
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-center sm:justify-end gap-3">
+                        <div class="text-right hidden sm:block">
+                            <p class="text-xs font-bold uppercase tracking-wider text-gray-500">Código QR</p>
+                            <p class="text-[11px] text-gray-400">Escanea con la cámara</p>
+                        </div>
+                        <div id="lobby-qrcode" class="p-2 bg-white border-2 border-purple-200 rounded-xl shadow-sm inline-block"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex flex-col sm:flex-row justify-between items-center bg-black/40 backdrop-blur-md px-6 py-4 rounded-2xl border border-white/10 mb-6 gap-4">
+                <div class="flex items-center gap-3">
+                    <span class="text-2xl">👥</span>
+                    <span class="font-display font-extrabold text-xl"><span id="player-count">0</span> Alumnos conectados</span>
+                </div>
+                <button onclick="startQuestion(0)" id="btn-start-game" class="w-full sm:w-auto btn-kahoot bg-emerald-500 hover:bg-emerald-400 border-emerald-700 text-white font-display font-black text-lg px-8 py-3 rounded-xl shadow-lg cursor-pointer">
+                    Comenzar Juego ▶
+                </button>
+            </div>
+
+            <div id="lobby-players-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 min-h-[160px] p-4 bg-white/5 rounded-3xl border border-white/10">
+                <div id="empty-lobby-msg" class="col-span-full flex flex-col items-center justify-center text-purple-300 py-8">
+                    <p class="text-lg font-semibold animate-pulse">Esperando a que tus alumnos se conecten...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Host Question Active -->
+        <div id="view-host-question" class="hidden w-full max-w-6xl animate-pop-in">
+            <div class="flex justify-between items-center mb-4">
+                <span class="bg-white/15 px-4 py-1.5 rounded-full font-display font-bold text-sm">
+                    Pregunta <span id="host-q-num">1</span> de 6
+                </span>
+                <div class="flex items-center gap-4">
+                    <div class="bg-black/40 px-4 py-1.5 rounded-full text-sm font-bold">
+                        Respuestas: <span id="host-answers-count" class="text-emerald-400">0</span> / <span id="host-total-players">0</span>
+                    </div>
+                    <button onclick="revealAnswer()" class="btn-kahoot bg-amber-500 hover:bg-amber-400 border-amber-700 text-gray-950 font-display font-extrabold px-4 py-1.5 rounded-xl text-sm cursor-pointer">
+                        Terminar Tiempo ⏭
+                    </button>
+                </div>
+            </div>
+
+            <div class="bg-white text-gray-900 rounded-3xl p-6 sm:p-10 shadow-2xl mb-6 text-center relative overflow-hidden">
+                <div class="absolute top-0 left-0 h-2 bg-purple-200 w-full">
+                    <div id="host-timer-bar" class="h-full bg-gradient-to-r from-pink-500 to-purple-600 transition-all duration-1000 linear" style="width: 100%;"></div>
+                </div>
+                
+                <div class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-purple-100 text-purple-900 font-display font-black text-2xl mb-4 shadow-inner" id="host-timer-text">
+                    25
+                </div>
+
+                <h2 id="host-question-text" class="text-xl sm:text-3xl font-extrabold leading-snug text-gray-900">
+                    Cargando pregunta...
+                </h2>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="host-options-container"></div>
+        </div>
+
+        <!-- Host Answer Reveal & Explanation -->
+        <div id="view-host-reveal" class="hidden w-full max-w-5xl animate-pop-in">
+            <div class="bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl p-6 sm:p-8 shadow-2xl mb-6">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 pb-4 border-b border-white/10">
+                    <div>
+                        <span class="text-xs font-bold uppercase tracking-wider text-emerald-400">Respuesta Correcta</span>
+                        <h3 id="reveal-question-title" class="text-lg sm:text-xl font-bold text-white mt-1">...</h3>
+                    </div>
+                    <button onclick="showLeaderboard()" class="w-full sm:w-auto btn-kahoot bg-blue-500 hover:bg-blue-400 border-blue-700 text-white font-display font-black px-6 py-3 rounded-xl shadow-lg cursor-pointer shrink-0">
+                        Ver Marcador 🏆
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-4 gap-4 items-end h-44 bg-black/30 rounded-2xl p-6 mb-6" id="reveal-bars"></div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3" id="reveal-options-list"></div>
+            </div>
+        </div>
+
+        <!-- Host Leaderboard -->
+        <div id="view-host-leaderboard" class="hidden w-full max-w-3xl text-center animate-pop-in">
+            <h2 class="text-3xl sm:text-4xl font-display font-black mb-2">Tabla de Posiciones</h2>
+            <p class="text-purple-200 mb-6">Top 5 jugadores más rápidos y certeros</p>
+
+            <div id="leaderboard-list" class="space-y-3 mb-8"></div>
+
+            <button onclick="nextStepFromLeaderboard()" id="btn-next-question" class="btn-kahoot bg-emerald-500 hover:bg-emerald-400 border-emerald-700 text-white font-display font-black text-xl px-10 py-4 rounded-2xl shadow-xl cursor-pointer">
+                Siguiente Pregunta ➔
+            </button>
+        </div>
+
+        <!-- ==================== PLAYER VIEWS ==================== -->
+
+        <!-- Player Waiting Room -->
+        <div id="view-player-wait" class="hidden w-full max-w-md text-center animate-pop-in">
+            <div class="bg-white/10 backdrop-blur-lg border border-white/20 rounded-3xl p-8 shadow-2xl">
+                <div class="w-20 h-20 rounded-full bg-emerald-500/20 border-2 border-emerald-400 flex items-center justify-center text-4xl mx-auto mb-4 animate-bounce">
+                    ✅
+                </div>
+                <h2 class="text-2xl font-display font-black mb-2">¡Estás dentro!</h2>
+                <p class="text-xl font-bold text-amber-300 mb-4" id="player-display-name">Jugador</p>
+                <p class="text-purple-200 text-sm">Mira la pantalla de la presentación. El juego comenzará en unos momentos...</p>
+            </div>
+        </div>
+
+        <!-- Player Question Pad -->
+        <div id="view-player-question" class="hidden w-full max-w-2xl animate-pop-in">
+            <div class="flex justify-between items-center mb-3 px-2">
+                <span class="font-display font-bold text-sm bg-white/10 px-3 py-1 rounded-full">
+                    Pregunta <span id="player-q-num">1</span>/6
+                </span>
+                <span class="font-display font-bold text-sm text-amber-300">
+                    Puntos: <span id="player-current-score">0</span>
+                </span>
+            </div>
+
+            <div class="bg-white/10 backdrop-blur-md rounded-2xl p-4 mb-4 border border-white/10 text-center">
+                <p id="player-q-text" class="font-bold text-base sm:text-lg text-white">...</p>
+            </div>
+
+            <div id="player-buttons-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                <button onclick="submitAnswer(0)" class="btn-kahoot opt-a p-5 rounded-2xl text-left flex items-center gap-4 shadow-lg cursor-pointer">
+                    <span class="w-10 h-10 rounded-xl bg-black/20 flex items-center justify-center font-display font-black text-xl shrink-0">▲</span>
+                    <span id="p-opt-0" class="font-bold text-sm sm:text-base leading-tight">Opción A</span>
+                </button>
+                <button onclick="submitAnswer(1)" class="btn-kahoot opt-b p-5 rounded-2xl text-left flex items-center gap-4 shadow-lg cursor-pointer">
+                    <span class="w-10 h-10 rounded-xl bg-black/20 flex items-center justify-center font-display font-black text-xl shrink-0">◆</span>
+                    <span id="p-opt-1" class="font-bold text-sm sm:text-base leading-tight">Opción B</span>
+                </button>
+                <button onclick="submitAnswer(2)" class="btn-kahoot opt-c p-5 rounded-2xl text-left flex items-center gap-4 shadow-lg cursor-pointer">
+                    <span class="w-10 h-10 rounded-xl bg-black/20 flex items-center justify-center font-display font-black text-xl shrink-0">●</span>
+                    <span id="p-opt-2" class="font-bold text-sm sm:text-base leading-tight">Opción C</span>
+                </button>
+                <button onclick="submitAnswer(3)" class="btn-kahoot opt-d p-5 rounded-2xl text-left flex items-center gap-4 shadow-lg cursor-pointer">
+                    <span class="w-10 h-10 rounded-xl bg-black/20 flex items-center justify-center font-display font-black text-xl shrink-0">■</span>
+                    <span id="p-opt-3" class="font-bold text-sm sm:text-base leading-tight">Opción D</span>
+                </button>
+            </div>
+
+            <div id="player-answered-state" class="hidden bg-white/10 backdrop-blur-lg border border-white/20 rounded-3xl p-8 text-center mt-4">
+                <div class="w-14 h-14 border-4 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                <h3 class="text-xl font-display font-black mb-1">¡Respuesta enviada!</h3>
+                <p class="text-purple-200 text-sm">Esperando a que termine el tiempo para ver los resultados...</p>
+            </div>
+        </div>
+
+        <!-- Player Result Feedback -->
+        <div id="view-player-result" class="hidden w-full max-w-md text-center animate-pop-in">
+            <div id="player-result-card" class="rounded-3xl p-8 shadow-2xl border-b-8">
+                <div id="player-result-icon" class="text-6xl mb-4">🎉</div>
+                <h2 id="player-result-title" class="text-3xl font-display font-black mb-2">¡Correcto!</h2>
+                <div class="bg-black/20 rounded-2xl py-3 px-6 inline-block mb-4">
+                    <span class="text-xs uppercase tracking-wider block opacity-80">Puntos ganados</span>
+                    <span id="player-points-earned" class="font-display font-black text-2xl">+850</span>
+                </div>
+                <p class="text-sm opacity-90">Puntaje total: <strong id="player-total-score">850</strong> pts</p>
+            </div>
+        </div>
+
+        <!-- ==================== FINAL PODIUM ==================== -->
+        <div id="view-podium" class="hidden w-full max-w-4xl text-center animate-pop-in">
+            <span class="inline-block py-1 px-4 rounded-full bg-amber-400/20 border border-amber-400/40 text-amber-300 text-xs font-bold uppercase tracking-widest mb-2">
+                Resultados Finales
+            </span>
+            <h2 class="text-4xl sm:text-5xl font-display font-black mb-8 drop-shadow">¡Podio de Ganadores!</h2>
+
+            <div class="flex items-end justify-center gap-2 sm:gap-6 h-72 sm:h-80 mb-8 px-2">
+                <!-- 2nd Place -->
+                <div class="flex flex-col items-center w-1/3 max-w-[180px]">
+                    <div class="mb-2 text-center">
+                        <span class="text-2xl">🥈</span>
+                        <p id="podium-2-name" class="font-display font-bold text-sm sm:text-lg truncate max-w-[120px] sm:max-w-[160px]">---</p>
+                        <p id="podium-2-score" class="text-xs text-purple-200 font-semibold">0 pts</p>
+                    </div>
+                    <div class="w-full h-36 sm:h-44 bg-gradient-to-t from-slate-500 to-slate-300 rounded-t-2xl flex items-start justify-center pt-4 shadow-xl border-t-4 border-white">
+                        <span class="font-display font-black text-4xl text-slate-800">2</span>
+                    </div>
+                </div>
+
+                <!-- 1st Place -->
+                <div class="flex flex-col items-center w-1/3 max-w-[200px]">
+                    <div class="mb-2 text-center animate-pulse-scale">
+                        <span class="text-4xl">👑</span>
+                        <p id="podium-1-name" class="font-display font-black text-base sm:text-xl text-amber-300 truncate max-w-[130px] sm:max-w-[180px]">---</p>
+                        <p id="podium-1-score" class="text-xs sm:text-sm text-amber-100 font-bold">0 pts</p>
+                    </div>
+                    <div class="w-full h-48 sm:h-56 bg-gradient-to-t from-amber-600 to-amber-400 rounded-t-2xl flex items-start justify-center pt-4 shadow-2xl border-t-4 border-amber-200">
+                        <span class="font-display font-black text-5xl text-amber-950">1</span>
+                    </div>
+                </div>
+
+                <!-- 3rd Place -->
+                <div class="flex flex-col items-center w-1/3 max-w-[180px]">
+                    <div class="mb-2 text-center">
+                        <span class="text-2xl">🥉</span>
+                        <p id="podium-3-name" class="font-display font-bold text-sm sm:text-lg truncate max-w-[120px] sm:max-w-[160px]">---</p>
+                        <p id="podium-3-score" class="text-xs text-purple-200 font-semibold">0 pts</p>
+                    </div>
+                    <div class="w-full h-28 sm:h-32 bg-gradient-to-t from-amber-800 to-amber-600 rounded-t-2xl flex items-start justify-center pt-4 shadow-xl border-t-4 border-amber-400">
+                        <span class="font-display font-black text-4xl text-amber-100">3</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap justify-center gap-4">
+                <button onclick="resetToHome()" class="btn-kahoot bg-purple-600 hover:bg-purple-500 border-purple-800 text-white font-display font-bold px-8 py-3 rounded-2xl shadow-lg cursor-pointer">
+                    Volver al Inicio
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Custom Modal -->
+    <div id="custom-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+        <div class="bg-gray-900 border border-white/20 rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl animate-pop-in">
+            <div id="modal-icon" class="text-4xl mb-3">⚠️</div>
+            <h3 id="modal-title" class="font-display font-extrabold text-xl mb-2">Aviso</h3>
+            <p id="modal-message" class="text-gray-300 text-sm mb-6">Mensaje</p>
+            <div id="modal-actions" class="flex justify-center gap-3">
+                <button onclick="closeModal()" class="bg-purple-600 hover:bg-purple-500 text-white font-bold px-6 py-2.5 rounded-xl w-full cursor-pointer">
+                    Entendido
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="w-full p-3 text-center text-xs text-purple-300/60">
+        Dinámica Interactiva • Normativa Aduanera y Declaración de Efectivo en México
+    </footer>
+
+    <!-- Firebase & Game Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const QUESTIONS = [
+            {
+                q: "¿A partir de qué monto en efectivo o documentos por cobrar surge la obligación legal de declarar ante las autoridades aduaneras al ingresar o salir de México?",
+                options: [
+                    "Más de 5,000 USD",
+                    "Más de 10,000 USD (o su equivalente en otras monedas)",
+                    "Más de 15,000 USD",
+                    "Más de 30,000 USD"
+                ],
+                correct: 1
+            },
+            {
+                q: "¿Qué impuesto o contribución tributaria debe pagarse por el simple hecho de transportar más de 10,000 USD a través de la aduana?",
+                options: [
+                    "Un impuesto general del 16% de IVA",
+                    "Un arancel fijo del 10% sobre el monto total",
+                    "Ningún impuesto, únicamente existe la obligación de declararlo",
+                    "Una tasa administrativa de 500 USD"
+                ],
+                correct: 2
+            },
+            {
+                q: "Si un pasajero realiza su declaración de dinero en formato electrónico a través del portal del SAT, ¿qué vigencia tiene el acuse de recibo generado por el sistema?",
+                options: [
+                    "15 días naturales",
+                    "30 días naturales",
+                    "45 días naturales",
+                    "60 días naturales"
+                ],
+                correct: 1
+            },
+            {
+                q: "¿Cómo se determina la multa aduanera aplicable cuando se omite declarar una cantidad superior a 10,000 USD pero menor a 30,000 USD?",
+                options: [
+                    "10% sobre la cantidad total de dinero transportado",
+                    "Multa del 20% al 40% únicamente sobre el monto que exceda de los 10,000 USD",
+                    "50% de la cantidad total en efectivo",
+                    "Confiscación del 100% del dinero excedente"
+                ],
+                correct: 1
+            },
+            {
+                q: "De acuerdo con la Ley Aduanera (Art. 199, Frac. V), ¿en qué porcentaje se puede disminuir la multa si el infractor la paga ANTES de que se le notifique la resolución de sanción?",
+                options: [
+                    "20%",
+                    "30%",
+                    "50%",
+                    "70%"
+                ],
+                correct: 2
+            },
+            {
+                q: "¿Cuál es la consecuencia jurídica de omitir la declaración de cantidades superiores a los 30,000 dólares de los EUA ante la aduana?",
+                options: [
+                    "Se considera únicamente una falta administrativa menor",
+                    "Se sanciona como un delito penal (con las mismas penas del contrabando y prisión)",
+                    "Se devuelve el dinero retenido tras cumplir un plazo de 30 días",
+                    "Solo aplica una amonestación verbal en el punto de revisión"
+                ],
+                correct: 1
+            }
+        ];
+
+        const QUESTION_TIME = 25;
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'aduana-quiz-default';
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        let currentUser = null;
+        let currentRole = null;
+        let currentPin = null;
+        let playerId = null;
+        let playerNickname = "";
+        let unsubRoom = null;
+        let unsubPlayers = null;
+        let timerInterval = null;
+        let soundEnabled = true;
+
+        let lastStateSignature = "";
+        let hasAnsweredCurrentQ = false;
+        let playersList = [];
+        let roomData = null;
+
+        let synth = null;
+        function initAudio() {
+            if (!synth && typeof Tone !== 'undefined') {
+                synth = new Tone.PolySynth(Tone.Synth).toDestination();
+                synth.volume.value = -8;
+            }
+        }
+
+        function playSound(type) {
+            if (!soundEnabled) return;
+            try {
+                initAudio();
+                if (Tone.context.state !== 'running') Tone.start();
+                if (!synth) return;
+
+                const now = Tone.now();
+                if (type === 'join') {
+                    synth.triggerAttackRelease(["C5", "E5"], "16n", now);
+                } else if (type === 'tick') {
+                    synth.triggerAttackRelease("G4", "32n", now);
+                } else if (type === 'correct') {
+                    synth.triggerAttackRelease(["C5", "E5", "G5", "C6"], "8n", now);
+                } else if (type === 'wrong') {
+                    synth.triggerAttackRelease(["F3", "E3"], "4n", now);
+                } else if (type === 'fanfare') {
+                    synth.triggerAttackRelease(["C4", "E4", "G4"], "8n", now);
+                    synth.triggerAttackRelease(["D4", "F4", "A4"], "8n", now + 0.15);
+                    synth.triggerAttackRelease(["E4", "G4", "B4"], "8n", now + 0.3);
+                    synth.triggerAttackRelease(["C5", "E5", "G5", "C6"], "2n", now + 0.45);
+                }
+            } catch (e) {}
+        }
+
+        window.toggleSound = () => {
+            soundEnabled = !soundEnabled;
+            document.getElementById('sound-icon').textContent = soundEnabled ? '🔊' : '🔇';
+        };
+
+        async function initApp() {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    const cred = await signInWithCustomToken(auth, __initial_auth_token);
+                    currentUser = cred.user;
+                } else {
+                    const cred = await signInAnonymously(auth);
+                    currentUser = cred.user;
+                }
+                
+                const urlParams = new URLSearchParams(window.location.search);
+                const pinParam = urlParams.get('pin');
+                if (pinParam && /^\d{6}$/.test(pinParam)) {
+                    document.getElementById('input-pin').value = pinParam;
+                    setTimeout(() => document.getElementById('input-nickname').focus(), 200);
+                }
+
+                showView('view-home');
+            } catch (err) {
+                console.error("Auth error:", err);
+                showModal("Error de conexión", "No se pudo conectar al servidor en tiempo real. Recarga la página.", "❌");
+            }
+        }
+
+        function showView(viewId) {
+            const views = [
+                'view-loading', 'view-home',
+                'view-host-lobby', 'view-host-question', 'view-host-reveal', 'view-host-leaderboard',
+                'view-player-wait', 'view-player-question', 'view-player-result',
+                'view-podium'
+            ];
+            views.forEach(v => {
+                const el = document.getElementById(v);
+                if (el) el.classList.add('hidden');
+            });
+            const target = document.getElementById(viewId);
+            if (target) target.classList.remove('hidden');
+        }
+
+        function showModal(title, message, icon = "⚠️", buttonsHtml = null) {
+            document.getElementById('modal-title').textContent = title;
+            document.getElementById('modal-message').textContent = message;
+            document.getElementById('modal-icon').textContent = icon;
+            const actions = document.getElementById('modal-actions');
+            if (buttonsHtml) {
+                actions.innerHTML = buttonsHtml;
+            } else {
+                actions.innerHTML = `<button onclick="closeModal()" class="bg-purple-600 hover:bg-purple-500 text-white font-bold px-6 py-2.5 rounded-xl w-full cursor-pointer">Entendido</button>`;
+            }
+            const modal = document.getElementById('custom-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        window.closeModal = () => {
+            const modal = document.getElementById('custom-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        };
+
+        window.confirmReset = () => {
+            if (!currentPin) return;
+            showModal(
+                "¿Salir de la partida?",
+                "Si sales ahora perderás tu conexión con la sala actual.",
+                "🚪",
+                `<button onclick="closeModal()" class="bg-gray-700 hover:bg-gray-600 text-white font-bold px-4 py-2.5 rounded-xl w-1/2 cursor-pointer">Cancelar</button>
+                 <button onclick="resetToHome()" class="bg-rose-600 hover:bg-rose-500 text-white font-bold px-4 py-2.5 rounded-xl w-1/2 cursor-pointer">Salir</button>`
+            );
+        };
+
+        window.resetToHome = () => {
+            closeModal();
+            if (unsubRoom) unsubRoom();
+            if (unsubPlayers) unsubPlayers();
+            if (timerInterval) clearInterval(timerInterval);
+            currentPin = null;
+            currentRole = null;
+            playersList = [];
+            roomData = null;
+            lastStateSignature = "";
+            document.getElementById('room-badge').classList.add('hidden');
+            showView('view-home');
+        };
+
+        window.createGame = async () => {
+            if (!currentUser) return;
+            const btn = document.getElementById('btn-create');
+            btn.disabled = true;
+            btn.textContent = "Creando sala...";
+
+            try {
+                const pin = Math.floor(100000 + Math.random() * 900000).toString();
+                const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', pin);
+                
+                await setDoc(roomRef, {
+                    pin: pin,
+                    hostId: currentUser.uid,
+                    status: 'lobby',
+                    currentQuestion: 0,
+                    questionStartTime: 0,
+                    createdAt: Date.now()
+                });
+
+                currentRole = 'host';
+                currentPin = pin;
+                document.getElementById('header-pin').textContent = pin;
+                document.getElementById('room-badge').classList.remove('hidden');
+                document.getElementById('host-pin-display').textContent = pin;
+                
+                const joinUrl = getJoinUrl(pin);
+                document.getElementById('host-share-url').value = joinUrl;
+
+                generateLobbyQR(pin);
+                listenToRoom(pin);
+                listenToPlayers(pin);
+                playSound('join');
+                showView('view-host-lobby');
+            } catch (err) {
+                console.error(err);
+                showModal("Error", "No se pudo crear la sala. Intenta nuevamente.", "❌");
+            } finally {
+                btn.disabled = false;
+                btn.textContent = "Crear Nueva Sala";
+            }
+        };
+
+        function getJoinUrl(pin) {
+            const loc = window.location;
+            let baseUrl = loc.protocol + "//" + loc.host + loc.pathname;
+            if (baseUrl.includes('about:blank') || baseUrl.includes('blob:')) {
+                baseUrl = window.location.href.split('?')[0];
+            }
+            try {
+                const url = new URL(baseUrl);
+                url.searchParams.set('pin', pin);
+                return url.toString();
+            } catch (e) {
+                return baseUrl + "?pin=" + pin;
+            }
+        }
+
+        function generateLobbyQR(pin) {
+            const qrContainer = document.getElementById('lobby-qrcode');
+            if (!qrContainer) return;
+            qrContainer.innerHTML = '';
+            const shareUrl = getJoinUrl(pin);
+            if (typeof QRCode !== 'undefined') {
+                new QRCode(qrContainer, {
+                    text: shareUrl,
+                    width: 110,
+                    height: 110,
+                    colorDark: "#1a0b2e",
+                    colorLight: "#ffffff",
+                    correctLevel: QRCode.CorrectLevel.M
+                });
+            }
+        }
+
+        window.copyInviteLink = () => {
+            if (!currentPin) return;
+            const joinUrl = getJoinUrl(currentPin);
+            
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(joinUrl).then(() => {
+                    showCopiedFeedback();
+                }).catch(() => {
+                    fallbackCopy(joinUrl);
+                });
+            } else {
+                fallbackCopy(joinUrl);
+            }
+        };
+
+        function fallbackCopy(text) {
+            const tempInput = document.createElement('input');
+            tempInput.value = text;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+            showCopiedFeedback();
+        }
+
+        function showCopiedFeedback() {
+            const label = document.getElementById('copy-link-text');
+            if (label) {
+                label.textContent = "¡Enlace Copiado!";
+                setTimeout(() => {
+                    label.textContent = "Copiar Enlace";
+                }, 2500);
+            }
+        }
+
+        window.startQuestion = async (qIndex) => {
+            if (!currentUser || currentRole !== 'host') return;
+            if (qIndex === 0 && playersList.length === 0) {
+                showModal("Sin jugadores", "Espera a que al menos un jugador se una con el PIN antes de iniciar.", "👥");
+                return;
+            }
+
+            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentPin);
+            await setDoc(roomRef, {
+                pin: currentPin,
+                hostId: currentUser.uid,
+                status: 'question',
+                currentQuestion: qIndex,
+                questionStartTime: Date.now(),
+                createdAt: roomData?.createdAt || Date.now()
+            }, { merge: true });
+        };
+
+        window.revealAnswer = async () => {
+            if (!currentUser || currentRole !== 'host') return;
+            if (timerInterval) clearInterval(timerInterval);
+            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentPin);
+            await setDoc(roomRef, {
+                status: 'reveal'
+            }, { merge: true });
+        };
+
+        window.showLeaderboard = async () => {
+            if (!currentUser || currentRole !== 'host') return;
+            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentPin);
+            await setDoc(roomRef, {
+                status: 'leaderboard'
+            }, { merge: true });
+        };
+
+        window.nextStepFromLeaderboard = async () => {
+            if (!currentUser || currentRole !== 'host' || !roomData) return;
+            const nextQ = roomData.currentQuestion + 1;
+            if (nextQ < QUESTIONS.length) {
+                await startQuestion(nextQ);
+            } else {
+                const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentPin);
+                await setDoc(roomRef, {
+                    status: 'finished'
+                }, { merge: true });
+            }
+        };
+
+        window.joinGame = async () => {
+            if (!currentUser) return;
+            const pin = document.getElementById('input-pin').value.trim();
+            const nick = document.getElementById('input-nickname').value.trim();
+
+            if (pin.length !== 6) {
+                showModal("PIN Inválido", "Por favor ingresa el código numérico de 6 dígitos.", "🔢");
+                return;
+            }
+            if (nick.length < 2) {
+                showModal("Apodo Requerido", "Escribe un nombre o apodo de al menos 2 caracteres.", "✍️");
+                return;
+            }
+
+            const btn = document.getElementById('btn-join');
+            btn.disabled = true;
+            btn.textContent = "Conectando...";
+
+            try {
+                const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', pin);
+                const roomSnap = await getDoc(roomRef);
+
+                if (!roomSnap.exists()) {
+                    showModal("Sala no encontrada", "Verifica que el PIN sea correcto e intenta de nuevo.", "🔍");
+                    btn.disabled = false;
+                    btn.textContent = "¡Entrar a la Partida!";
+                    return;
+                }
+
+                const data = roomSnap.data();
+                if (data.status === 'finished') {
+                    showModal("Partida Terminada", "Este juego ya ha finalizado.", "🏁");
+                    btn.disabled = false;
+                    btn.textContent = "¡Entrar a la Partida!";
+                    return;
+                }
+
+                playerId = currentUser.uid;
+                playerNickname = nick;
+                const playerRef = doc(db, 'artifacts', appId, 'public', 'data', `players_${pin}`, playerId);
+                
+                await setDoc(playerRef, {
+                    id: playerId,
+                    nickname: nick,
+                    score: 0,
+                    lastAnswerQ: -1,
+                    lastAnswerIndex: -1,
+                    lastPointsEarned: 0,
+                    joinedAt: Date.now()
+                });
+
+                currentRole = 'player';
+                currentPin = pin;
+                document.getElementById('header-pin').textContent = pin;
+                document.getElementById('room-badge').classList.remove('hidden');
+                document.getElementById('player-display-name').textContent = nick;
+
+                listenToRoom(pin);
+                listenToPlayers(pin);
+                playSound('join');
+                showView('view-player-wait');
+            } catch (err) {
+                console.error(err);
+                showModal("Error", "Ocurrió un problema al unirte a la sala.", "❌");
+            } finally {
+                btn.disabled = false;
+                btn.textContent = "¡Entrar a la Partida!";
+            }
+        };
+
+        window.submitAnswer = async (optionIndex) => {
+            if (!currentUser || currentRole !== 'player' || hasAnsweredCurrentQ || !roomData) return;
+            hasAnsweredCurrentQ = true;
+
+            document.getElementById('player-buttons-grid').classList.add('hidden');
+            document.getElementById('player-answered-state').classList.remove('hidden');
+
+            const qIdx = roomData.currentQuestion;
+            const qObj = QUESTIONS[qIdx];
+            const isCorrect = (optionIndex === qObj.correct);
+
+            let pointsEarned = 0;
+            if (isCorrect) {
+                const elapsedSec = Math.max(0, (Date.now() - roomData.questionStartTime) / 1000);
+                const ratio = Math.max(0, 1 - (elapsedSec / QUESTION_TIME));
+                pointsEarned = Math.round(500 + (500 * ratio));
+            }
+
+            const me = playersList.find(p => p.id === playerId);
+            const currentScore = me ? (me.score || 0) : 0;
+            const newScore = currentScore + pointsEarned;
+
+            try {
+                const playerRef = doc(db, 'artifacts', appId, 'public', 'data', `players_${currentPin}`, playerId);
+                await updateDoc(playerRef, {
+                    score: newScore,
+                    lastAnswerQ: qIdx,
+                    lastAnswerIndex: optionIndex,
+                    lastPointsEarned: pointsEarned
+                });
+            } catch (err) {
+                console.error("Error saving answer:", err);
+            }
+        };
+
+        function listenToRoom(pin) {
+            if (unsubRoom) unsubRoom();
+            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', pin);
+            
+            unsubRoom = onSnapshot(roomRef, (snap) => {
+                if (!snap.exists()) return;
+                roomData = snap.data();
+                
+                const signature = `${roomData.status}_${roomData.currentQuestion}_${roomData.questionStartTime || 0}`;
+                if (signature !== lastStateSignature) {
+                    lastStateSignature = signature;
+                    handleStateChange(roomData);
+                }
+            }, (error) => {
+                console.error("Room snapshot error:", error);
+            });
+        }
+
+        function listenToPlayers(pin) {
+            if (unsubPlayers) unsubPlayers();
+            const colRef = collection(db, 'artifacts', appId, 'public', 'data', `players_${pin}`);
+            
+            unsubPlayers = onSnapshot(colRef, (snapshot) => {
+                const list = [];
+                snapshot.forEach(docSnap => {
+                    list.push(docSnap.data());
+                });
+                list.sort((a, b) => (b.score || 0) - (a.score || 0));
+                playersList = list;
+                updatePlayersUI();
+            }, (error) => {
+                console.error("Players snapshot error:", error);
+            });
+        }
+
+        function handleStateChange(room) {
+            if (timerInterval) clearInterval(timerInterval);
+            const qIdx = room.currentQuestion || 0;
+            const qObj = QUESTIONS[qIdx] || QUESTIONS[0];
+
+            if (currentRole === 'host') {
+                if (room.status === 'lobby') {
+                    showView('view-host-lobby');
+                } 
+                else if (room.status === 'question') {
+                    showView('view-host-question');
+                    document.getElementById('host-q-num').textContent = qIdx + 1;
+                    document.getElementById('host-question-text').textContent = qObj.q;
+                    document.getElementById('host-total-players').textContent = playersList.length;
+                    updateAnswerCount();
+
+                    const styles = ['opt-a', 'opt-b', 'opt-c', 'opt-d'];
+                    const shapes = ['▲', '◆', '●', '■'];
+                    const container = document.getElementById('host-options-container');
+                    container.innerHTML = qObj.options.map((opt, idx) => `
+                        <div class="${styles[idx]} p-5 rounded-2xl flex items-center gap-4 shadow-lg border-b-4">
+                            <span class="w-10 h-10 rounded-xl bg-black/20 flex items-center justify-center font-display font-black text-xl shrink-0">${shapes[idx]}</span>
+                            <span class="font-bold text-base sm:text-lg leading-snug">${opt}</span>
+                        </div>
+                    `).join('');
+
+                    startHostTimer(room.questionStartTime || Date.now());
+                } 
+                else if (room.status === 'reveal') {
+                    showView('view-host-reveal');
+                    renderHostReveal(qIdx);
+                } 
+                else if (room.status === 'leaderboard') {
+                    showView('view-host-leaderboard');
+                    renderLeaderboard(qIdx);
+                } 
+                else if (room.status === 'finished') {
+                    showView('view-podium');
+                    renderPodium();
+                }
+            } 
+            else if (currentRole === 'player') {
+                if (room.status === 'lobby') {
+                    showView('view-player-wait');
+                } 
+                else if (room.status === 'question') {
+                    hasAnsweredCurrentQ = false;
+                    showView('view-player-question');
+                    document.getElementById('player-q-num').textContent = qIdx + 1;
+                    document.getElementById('player-q-text').textContent = qObj.q;
+                    
+                    const me = playersList.find(p => p.id === playerId);
+                    document.getElementById('player-current-score').textContent = me ? (me.score || 0) : 0;
+
+                    qObj.options.forEach((opt, idx) => {
+                        document.getElementById(`p-opt-${idx}`).textContent = opt;
+                    });
+
+                    if (me && me.lastAnswerQ === qIdx) {
+                        hasAnsweredCurrentQ = true;
+                        document.getElementById('player-buttons-grid').classList.add('hidden');
+                        document.getElementById('player-answered-state').classList.remove('hidden');
+                    } else {
+                        document.getElementById('player-buttons-grid').classList.remove('hidden');
+                        document.getElementById('player-answered-state').classList.add('hidden');
+                    }
+                } 
+                else if (room.status === 'reveal' || room.status === 'leaderboard') {
+                    showView('view-player-result');
+                    renderPlayerResult(qIdx);
+                } 
+                else if (room.status === 'finished') {
+                    showView('view-podium');
+                    renderPodium();
+                }
+            }
+        }
+
+        function startHostTimer(startTime) {
+            const bar = document.getElementById('host-timer-bar');
+            const text = document.getElementById('host-timer-text');
+            
+            const update = () => {
+                const elapsed = (Date.now() - startTime) / 1000;
+                const remaining = Math.max(0, Math.ceil(QUESTION_TIME - elapsed));
+                const pct = Math.max(0, ((QUESTION_TIME - elapsed) / QUESTION_TIME) * 100);
+                
+                text.textContent = remaining;
+                bar.style.width = `${pct}%`;
+
+                if (remaining <= 5 && remaining > 0) {
+                    playSound('tick');
+                }
+
+                if (remaining <= 0) {
+                    clearInterval(timerInterval);
+                    revealAnswer();
+                }
+            };
+            update();
+            timerInterval = setInterval(update, 500);
+        }
+
+        function updatePlayersUI() {
+            if (!roomData) return;
+
+            if (currentRole === 'host') {
+                document.getElementById('player-count').textContent = playersList.length;
+                const grid = document.getElementById('lobby-players-grid');
+                if (playersList.length === 0) {
+                    grid.innerHTML = `<div class="col-span-full flex flex-col items-center justify-center text-purple-300 py-8">
+                        <p class="text-lg font-semibold animate-pulse">Esperando a que se unan los jugadores...</p>
+                    </div>`;
+                } else {
+                    grid.innerHTML = playersList.map(p => `
+                        <div class="bg-white/15 border border-white/20 rounded-2xl px-4 py-3 font-display font-bold text-base truncate shadow animate-pop-in flex items-center justify-center gap-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+                            <span>${escapeHtml(p.nickname)}</span>
+                        </div>
+                    `).join('');
+                }
+
+                if (roomData.status === 'question') {
+                    updateAnswerCount();
+                    const answeredCount = playersList.filter(p => p.lastAnswerQ === roomData.currentQuestion).length;
+                    if (playersList.length > 0 && answeredCount >= playersList.length) {
+                        setTimeout(() => {
+                            if (roomData && roomData.status === 'question') {
+                                revealAnswer();
+                            }
+                        }, 800);
+                    }
+                }
+            }
+        }
+
+        function updateAnswerCount() {
+            if (!roomData) return;
+            const answered = playersList.filter(p => p.lastAnswerQ === roomData.currentQuestion).length;
+            document.getElementById('host-answers-count').textContent = answered;
+            document.getElementById('host-total-players').textContent = playersList.length;
+        }
+
+        function renderHostReveal(qIdx) {
+            const qObj = QUESTIONS[qIdx];
+            document.getElementById('reveal-question-title').textContent = qObj.q;
+
+            const counts = [0, 0, 0, 0];
+            playersList.forEach(p => {
+                if (p.lastAnswerQ === qIdx && p.lastAnswerIndex >= 0 && p.lastAnswerIndex <= 3) {
+                    counts[p.lastAnswerIndex]++;
+                }
+            });
+            const maxCount = Math.max(1, ...counts);
+
+            const colors = ['bg-rose-500', 'bg-blue-500', 'bg-amber-500', 'bg-emerald-500'];
+            const shapes = ['▲', '◆', '●', '■'];
+            
+            document.getElementById('reveal-bars').innerHTML = counts.map((count, idx) => {
+                const heightPct = Math.max(12, Math.round((count / maxCount) * 100));
+                const isCorrect = idx === qObj.correct;
+                return `
+                    <div class="flex flex-col items-center justify-end h-full">
+                        <span class="font-display font-black text-lg mb-1 ${isCorrect ? 'text-emerald-400' : 'text-white'}">
+                            ${count} ${isCorrect ? '✓' : ''}
+                        </span>
+                        <div class="${colors[idx]} w-full max-w-[70px] rounded-t-xl transition-all duration-700 ${isCorrect ? 'ring-4 ring-white' : 'opacity-60'}" style="height: ${heightPct}%"></div>
+                        <span class="mt-2 font-display font-black text-sm">${shapes[idx]}</span>
+                    </div>
+                `;
+            }).join('');
+
+            const bgStyles = ['opt-a', 'opt-b', 'opt-c', 'opt-d'];
+            document.getElementById('reveal-options-list').innerHTML = qObj.options.map((opt, idx) => {
+                const isCorrect = idx === qObj.correct;
+                return `
+                    <div class="${bgStyles[idx]} p-4 rounded-2xl flex items-center justify-between gap-3 ${isCorrect ? 'ring-4 ring-white shadow-xl' : 'opacity-45'}">
+                        <div class="flex items-center gap-3">
+                            <span class="font-display font-black text-lg">${shapes[idx]}</span>
+                            <span class="font-bold text-sm sm:text-base">${opt}</span>
+                        </div>
+                        ${isCorrect ? '<span class="bg-white text-gray-900 font-black text-xs px-2.5 py-1 rounded-full shrink-0">CORRECTA</span>' : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderLeaderboard(qIdx) {
+            const top5 = playersList.slice(0, 5);
+            const listEl = document.getElementById('leaderboard-list');
+            
+            if (top5.length === 0) {
+                listEl.innerHTML = `<p class="text-purple-300">No hay puntajes registrados aún.</p>`;
+            } else {
+                listEl.innerHTML = top5.map((p, idx) => `
+                    <div class="flex items-center justify-between bg-white/15 backdrop-blur-md border border-white/20 px-6 py-4 rounded-2xl shadow-lg ${idx === 0 ? 'ring-2 ring-amber-400 bg-amber-500/20' : ''}">
+                        <div class="flex items-center gap-4">
+                            <span class="w-8 h-8 rounded-full ${idx === 0 ? 'bg-amber-400 text-gray-950' : 'bg-white/20 text-white'} font-display font-black flex items-center justify-center">
+                                ${idx + 1}
+                            </span>
+                            <span class="font-display font-extrabold text-lg sm:text-xl">${escapeHtml(p.nickname)}</span>
+                        </div>
+                        <span class="font-display font-black text-xl text-amber-300">${p.score || 0} pts</span>
+                    </div>
+                `).join('');
+            }
+
+            const btnNext = document.getElementById('btn-next-question');
+            if (qIdx + 1 >= QUESTIONS.length) {
+                btnNext.textContent = "Ver Podio Final 🏆";
+            } else {
+                btnNext.textContent = `Siguiente Pregunta (${qIdx + 2}/${QUESTIONS.length}) ➔`;
+            }
+        }
+
+        function renderPlayerResult(qIdx) {
+            const me = playersList.find(p => p.id === playerId);
+            const card = document.getElementById('player-result-card');
+            const icon = document.getElementById('player-result-icon');
+            const title = document.getElementById('player-result-title');
+            const earned = document.getElementById('player-points-earned');
+            const total = document.getElementById('player-total-score');
+
+            const answeredThisQ = me && me.lastAnswerQ === qIdx;
+            const points = answeredThisQ ? (me.lastPointsEarned || 0) : 0;
+            const isCorrect = points > 0;
+
+            if (isCorrect) {
+                card.className = "rounded-3xl p-8 shadow-2xl border-b-8 bg-emerald-600 border-emerald-800 text-white";
+                icon.textContent = "🎉";
+                title.textContent = "¡Respuesta Correcta!";
+                earned.textContent = `+${points}`;
+                playSound('correct');
+            } else {
+                card.className = "rounded-3xl p-8 shadow-2xl border-b-8 bg-rose-600 border-rose-800 text-white";
+                icon.textContent = answeredThisQ ? "😅" : "⏰";
+                title.textContent = answeredThisQ ? "¡Casi! Respuesta Incorrecta" : "¡Se acabó el tiempo!";
+                earned.textContent = "+0";
+                playSound('wrong');
+            }
+
+            total.textContent = me ? (me.score || 0) : 0;
+        }
+
+        function renderPodium() {
+            const p1 = playersList[0];
+            const p2 = playersList[1];
+            const p3 = playersList[2];
+
+            document.getElementById('podium-1-name').textContent = p1 ? p1.nickname : "---";
+            document.getElementById('podium-1-score').textContent = p1 ? `${p1.score || 0} pts` : "";
+
+            document.getElementById('podium-2-name').textContent = p2 ? p2.nickname : "---";
+            document.getElementById('podium-2-score').textContent = p2 ? `${p2.score || 0} pts` : "";
+
+            document.getElementById('podium-3-name').textContent = p3 ? p3.nickname : "---";
+            document.getElementById('podium-3-score').textContent = p3 ? `${p3.score || 0} pts` : "";
+
+            playSound('fanfare');
+            if (typeof confetti === 'function') {
+                confetti({
+                    particleCount: 120,
+                    spread: 80,
+                    origin: { y: 0.6 }
+                });
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        initApp();
+    </script>
+</body>
+</html>
